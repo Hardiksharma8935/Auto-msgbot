@@ -10,20 +10,17 @@ from utils import owner_only, build_inline_keyboard, build_reply_keyboard
 @owner_only
 async def start_cmd(update, context):
     reply_markup = await build_reply_keyboard()
-    await update.message.reply_text(
-        "👋 Welcome Owner! Use /help to see all configuration commands.",
-        reply_markup=reply_markup
-    )
+    await update.message.reply_text("👋 Welcome Owner! Use /help to see all configuration commands.", reply_markup=reply_markup)
 
 @owner_only
 async def help_cmd(update, context):
     help_text = (
         "🛠 **Owner Control Panel**\n"
-        "/setmessage `<text>` - Add ad (Supports Formatting)\n"
+        "/setmessage `<text>` - Add ad\n"
         "/removemessage `<id>` - Delete ad\n"
         "/messages - List ads\n"
         "/setinterval `<minutes>` - Change frequency\n"
-        "/welcome `<text>` - Set welcome (Use {name})\n"
+        "/welcome `<text>` - Set welcome (Or reply to media!)\n"
         "/buttons ... - Manage Inline Buttons\n"
         "/keyboard ... - Manage Reply Keyboard\n"
         "/groups - Active groups\n"
@@ -43,18 +40,6 @@ async def setmessage_cmd(update, context):
     
     await db.add_message(html_text)
     await update.message.reply_text("✅ Advertisement message added successfully!\n(Your bold, quotes, and links are saved!)")
-
-@owner_only
-async def welcome_cmd(update, context):
-    if not update.message.text_html or len(update.message.text.split()) < 2:
-        await update.message.reply_text("Usage: `/welcome <text>`\nHint: Use {name} to dynamically insert the user's name.", parse_mode="HTML")
-        return
-        
-    command = update.message.text.split()[0]
-    html_text = update.message.text_html.replace(command, '', 1).strip()
-    
-    await db.set_setting("welcome", html_text)
-    await update.message.reply_text("✅ Welcome message updated!\n(Your bold, quotes, and links are saved!)")
 
 @owner_only
 async def removemessage_cmd(update, context):
@@ -78,7 +63,7 @@ async def messages_cmd(update, context):
 
 @owner_only
 async def setinterval_cmd(update, context):
-    from jobs import ad_job # Local import to avoid circular dependency issues
+    from jobs import ad_job
     try:
         minutes = int(context.args[0])
         if minutes < 1:
@@ -93,6 +78,40 @@ async def setinterval_cmd(update, context):
         await update.message.reply_text(f"⏱ Advertisement interval updated to **{minutes} minutes**.", parse_mode="Markdown")
     except (IndexError, ValueError):
         await update.message.reply_text("Usage: `/setinterval <minutes>`", parse_mode="Markdown")
+
+@owner_only
+async def welcome_cmd(update, context):
+    reply_msg = update.message.reply_to_message
+    
+    # Check if owner replied to media to set a rich welcome
+    if reply_msg:
+        media_id, media_type = None, None
+        if reply_msg.photo: media_id, media_type = reply_msg.photo[-1].file_id, "photo"
+        elif reply_msg.video: media_id, media_type = reply_msg.video.file_id, "video"
+        elif reply_msg.document: media_id, media_type = reply_msg.document.file_id, "document"
+        elif reply_msg.animation: media_id, media_type = reply_msg.animation.file_id, "animation"
+        
+        if media_id:
+            await db.set_setting("welcome_media_id", media_id)
+            await db.set_setting("welcome_media_type", media_type)
+            
+            caption = reply_msg.caption_html if reply_msg.caption_html else "Welcome {name}!"
+            await db.set_setting("welcome", caption)
+            await update.message.reply_text("✅ Media Welcome message updated!")
+            return
+            
+    # Standard text-only welcome
+    if not update.message.text_html or len(update.message.text.split()) < 2:
+        await update.message.reply_text("Usage: `/welcome <text>`\nHint: Use {name} to insert the user's name.\n*You can also reply to a photo/video with /welcome to set a media welcome!*", parse_mode="HTML")
+        return
+        
+    command = update.message.text.split()[0]
+    html_text = update.message.text_html.replace(command, '', 1).strip()
+    
+    await db.set_setting("welcome", html_text)
+    await db.set_setting("welcome_media_id", "") 
+    await db.set_setting("welcome_media_type", "")
+    await update.message.reply_text("✅ Text Welcome message updated!")
 
 @owner_only
 async def button_cmd(update, context):
@@ -237,33 +256,41 @@ async def groups_cmd(update, context):
 
 # --- Event Handlers ---
 async def bot_added_to_group(update, context):
-    """Registers bot when added to group as standard member or admin."""
     result = update.my_chat_member
     chat = result.chat
-    
     if result.new_chat_member.status in ['member', 'administrator']:
         await db.add_group(chat.id, chat.title)
         await context.bot.send_message(OWNER_ID, f"✅ Successfully joined **{chat.title}**!", parse_mode="Markdown")
     elif result.new_chat_member.status in ['left', 'kicked']:
         await db.remove_group(chat.id)
-        await context.bot.send_message(OWNER_ID, f"❌ I was removed from **{chat.title}**.", parse_mode="Markdown")
 
 async def welcome_new_member(update, context):
-    new_members = update.message.new_chat_members
-    if new_members:
+    result = update.chat_member
+    
+    if result.new_chat_member.status in ['member', 'restricted'] and result.old_chat_member.status in ['left', 'kicked']:
+        member = result.new_chat_member.user
+        chat = result.chat
+        
+        if member.is_bot:
+            return
+
         welcome_text = await db.get_setting("welcome")
+        media_id = await db.get_setting("welcome_media_id")
+        media_type = await db.get_setting("welcome_media_type")
         reply_markup = await build_inline_keyboard()
-        for member in new_members:
-            if member.id != context.bot.id:
-                try:
-                    await context.bot.send_message(
-                        chat_id=update.message.chat_id,
-                        text=welcome_text.replace("{name}", member.first_name),
-                        reply_markup=reply_markup,
-                        parse_mode="HTML"
-                    )
-                except Exception:
-                    pass
+        
+        formatted_text = welcome_text.replace("{name}", member.first_name)
+        
+        try:
+            if media_id and media_type:
+                if media_type == 'photo': await context.bot.send_photo(chat_id=chat.id, photo=media_id, caption=formatted_text, parse_mode="HTML", reply_markup=reply_markup)
+                elif media_type == 'video': await context.bot.send_video(chat_id=chat.id, video=media_id, caption=formatted_text, parse_mode="HTML", reply_markup=reply_markup)
+                elif media_type == 'document': await context.bot.send_document(chat_id=chat.id, document=media_id, caption=formatted_text, parse_mode="HTML", reply_markup=reply_markup)
+                elif media_type == 'animation': await context.bot.send_animation(chat_id=chat.id, animation=media_id, caption=formatted_text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await context.bot.send_message(chat_id=chat.id, text=formatted_text, reply_markup=reply_markup, parse_mode="HTML")
+        except Exception:
+            pass
 
 async def handle_callback(update, context):
     query = update.callback_query
@@ -280,11 +307,14 @@ async def handle_callback(update, context):
                 await query.answer("⚠️ Please start the bot in private messages first to receive this file/message!", show_alert=True)
     await query.answer()
 
-async def handle_dm(update, context):
-    """Two-way private chat routing and Reply Keyboard interception."""
+async def handle_general_messages(update, context):
+    if not update.message: return
+    
     user_id = update.effective_user.id
+    chat_type = update.message.chat.type
     text = update.message.text
     
+    # 1. KEYBOARD INTERCEPTOR
     if text:
         btn = await db.get_reply_button_by_name(text)
         if btn:
@@ -302,26 +332,31 @@ async def handle_dm(update, context):
                 except Exception: pass
             return
 
-    if user_id == OWNER_ID:
-        if update.message.reply_to_message:
-            replied_text = update.message.reply_to_message.text or update.message.reply_to_message.caption or ""
-            match = re.search(r'#user_(\d+)', replied_text)
-            if match:
-                target_user = int(match.group(1))
-                try:
-                    await update.message.copy(target_user)
-                except Exception:
-                    await update.message.reply_text("❌ Failed to deliver.")
-            else:
-                await update.message.reply_text("⚠️ Could not locate the user ID.")
-    else:
-        await db.add_user(user_id, update.effective_user.username)
-        reply_markup = await build_reply_keyboard()
-        try:
-            await context.bot.send_message(chat_id=user_id, text="Message sent to support.", reply_markup=reply_markup)
-        except Exception:
-            pass
+    # 2. PRIVATE DM SUPPORT ROUTING
+    if chat_type == 'private':
+        if user_id == OWNER_ID:
+            if update.message.reply_to_message:
+                replied_msg_id = update.message.reply_to_message.message_id
+                target_user = await db.get_support_user(replied_msg_id)
+                
+                if target_user:
+                    try:
+                        await update.message.copy(target_user)
+                    except Exception:
+                        await update.message.reply_text("❌ Failed to deliver: User blocked the bot.")
+                else:
+                    await update.message.reply_text("⚠️ Could not locate the user ID in the database. (Message too old or not a forwarded support ticket).")
+        else:
+            await db.add_user(user_id, update.effective_user.username)
+            reply_markup = await build_reply_keyboard()
+            
+            try:
+                await context.bot.send_message(chat_id=user_id, text="Message sent to support.", reply_markup=reply_markup)
+            except Exception: pass
 
-        msg = await update.message.copy(OWNER_ID)
-        await context.bot.send_message(OWNER_ID, f"💬 **DM from {update.effective_user.first_name}**\n`#user_{user_id}`", reply_to_message_id=msg.message_id, parse_mode="Markdown")
-    
+            msg = await update.message.copy(OWNER_ID)
+            info_msg = await context.bot.send_message(OWNER_ID, f"💬 **DM from {update.effective_user.first_name}**", reply_to_message_id=msg.message_id, parse_mode="Markdown")
+            
+            await db.map_support_msg(msg.message_id, user_id)
+            await db.map_support_msg(info_msg.message_id, user_id)
+                        
