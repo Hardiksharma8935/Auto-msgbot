@@ -6,13 +6,11 @@ class Database:
         self.db_path = db_path
 
     async def _execute(self, query, params=()):
-        """Base execution method for easy migration to Postgres (asyncpg) later."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(query, params)
             await db.commit()
 
     async def _fetchall(self, query, params=()):
-        """Base fetch method."""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(query, params)
@@ -25,10 +23,12 @@ class Database:
             await db.execute('''CREATE TABLE IF NOT EXISTS buttons (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, btn_type TEXT, content TEXT)''')
             await db.execute('''CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, title TEXT)''')
             await db.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT)''')
+            await db.execute('''CREATE TABLE IF NOT EXISTS reply_buttons (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, r_type TEXT, content TEXT, media_type TEXT)''')
             
             # Default configurations
             await db.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('interval', '30'))
             await db.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('welcome', 'Welcome to the group {name}!'))
+            await db.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('keyboard_enabled', '1'))
             await db.commit()
 
     # --- Groups ---
@@ -66,7 +66,7 @@ class Database:
         res = await self._fetchall('SELECT value FROM settings WHERE key = ?', (key,))
         return res[0]['value'] if res else ""
 
-    # --- Buttons ---
+    # --- Inline Buttons ---
     async def add_button(self, name, btn_type, content):
         await self._execute('INSERT INTO buttons (name, btn_type, content) VALUES (?, ?, ?)', (name, btn_type, content))
 
@@ -78,6 +78,20 @@ class Database:
 
     async def get_button(self, btn_id):
         res = await self._fetchall('SELECT * FROM buttons WHERE id = ?', (btn_id,))
+        return res[0] if res else None
+
+    # --- Reply Keyboard Buttons ---
+    async def add_reply_button(self, name, r_type, content, media_type=None):
+        await self._execute('INSERT INTO reply_buttons (name, r_type, content, media_type) VALUES (?, ?, ?, ?)', (name, r_type, content, media_type))
+
+    async def del_reply_button(self, btn_id):
+        await self._execute('DELETE FROM reply_buttons WHERE id = ?', (btn_id,))
+
+    async def get_all_reply_buttons(self):
+        return await self._fetchall('SELECT * FROM reply_buttons')
+
+    async def get_reply_button_by_name(self, name):
+        res = await self._fetchall('SELECT * FROM reply_buttons WHERE name = ?', (name,))
         return res[0] if res else None
 
 db = Database()
