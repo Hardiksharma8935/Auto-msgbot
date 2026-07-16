@@ -5,7 +5,7 @@ from database import db
 from handlers import (
     start_cmd, help_cmd, setmessage_cmd, removemessage_cmd, messages_cmd,
     setinterval_cmd, welcome_cmd, button_cmd, keyboard_cmd, groups_cmd, stats_cmd, broadcast_cmd,
-    bot_added_to_group, welcome_new_member, handle_dm, handle_callback
+    bot_added_to_group, welcome_new_member, handle_general_messages, handle_callback
 )
 from jobs import ad_job
 
@@ -21,6 +21,7 @@ async def post_init(application):
 if __name__ == '__main__':
     application = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
 
+    # Commands
     application.add_handler(CommandHandler("start", start_cmd))
     application.add_handler(CommandHandler("help", help_cmd))
     application.add_handler(CommandHandler("setmessage", setmessage_cmd))
@@ -34,11 +35,16 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler("stats", stats_cmd))
     application.add_handler(CommandHandler("broadcast", broadcast_cmd))
 
+    # Core Events
     application.add_handler(ChatMemberHandler(bot_added_to_group, ChatMemberHandler.MY_CHAT_MEMBER))
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
+    
+    # Catch all joins including Invite Links
+    application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     
     application.add_handler(CallbackQueryHandler(handle_callback))
-    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & ~filters.COMMAND, handle_dm))
+    
+    # Unified text handler for Private chats AND Group Keyboard listening
+    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_general_messages))
 
     application.run_polling()
     
