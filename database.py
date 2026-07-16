@@ -25,6 +25,9 @@ class Database:
             await db.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT)''')
             await db.execute('''CREATE TABLE IF NOT EXISTS reply_buttons (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, r_type TEXT, content TEXT, media_type TEXT)''')
             
+            # Support logs to track message IDs to User IDs for flawless replying
+            await db.execute('''CREATE TABLE IF NOT EXISTS support_logs (msg_id INTEGER PRIMARY KEY, user_id INTEGER)''')
+            
             # Default configurations
             await db.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('interval', '30'))
             await db.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('welcome', 'Welcome to the group {name}!'))
@@ -93,5 +96,13 @@ class Database:
     async def get_reply_button_by_name(self, name):
         res = await self._fetchall('SELECT * FROM reply_buttons WHERE name = ?', (name,))
         return res[0] if res else None
+
+    # --- Support Log Methods ---
+    async def map_support_msg(self, msg_id, user_id):
+        await self._execute('INSERT OR REPLACE INTO support_logs (msg_id, user_id) VALUES (?, ?)', (msg_id, user_id))
+
+    async def get_support_user(self, msg_id):
+        res = await self._fetchall('SELECT user_id FROM support_logs WHERE msg_id = ?', (msg_id,))
+        return res[0]['user_id'] if res else None
 
 db = Database()
