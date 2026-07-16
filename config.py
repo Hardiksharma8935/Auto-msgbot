@@ -9,4 +9,4 @@ DB_PATH = os.getenv("DB_PATH", "bot_data.db")
 
 if not BOT_TOKEN or not OWNER_ID:
     raise ValueError("⚠️ BOT_TOKEN and OWNER_ID must be provided in the .env file.")
-  
+    
