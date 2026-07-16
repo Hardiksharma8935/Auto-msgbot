@@ -160,16 +160,30 @@ async def groups_cmd(update, context):
 
 # --- Event Handlers ---
 async def bot_added_to_group(update, context):
-    """Admin Rights Check when bot is added to a group."""
+    """Registers the bot when added to a group. Admin is not strictly required."""
     result = update.my_chat_member
     chat = result.chat
     
+    # 'member' means standard group member. 'administrator' means group admin.
     if result.new_chat_member.status in ['member', 'administrator']:
+        # Save the group to the database
         await db.add_group(chat.id, chat.title)
-        if result.new_chat_member.status != 'administrator' or not result.new_chat_member.can_post_messages:
-            await context.bot.send_message(OWNER_ID, f"⚠️ I was added to the group **{chat.title}**, but I lack permissions to post. Please ensure I am an Admin with posting rights.", parse_mode="Markdown")
+        
+        # Notify the owner that the bot joined successfully
+        await context.bot.send_message(
+            OWNER_ID, 
+            f"✅ Successfully joined **{chat.title}**! I will now start sending scheduled ads and welcomes here.", 
+            parse_mode="Markdown"
+        )
+            
     elif result.new_chat_member.status in ['left', 'kicked']:
+        # Remove the group from the database if kicked
         await db.remove_group(chat.id)
+        await context.bot.send_message(
+            OWNER_ID, 
+            f"❌ I was removed from the group **{chat.title}**.", 
+            parse_mode="Markdown"
+        )
 
 async def welcome_new_member(update, context):
     """Fires Auto Welcome on user join."""
