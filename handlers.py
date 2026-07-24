@@ -13,81 +13,81 @@ async def start_cmd(update, context):
     reply_markup = await build_reply_keyboard()
 
     if chat.type in ['group', 'supergroup']:
-        # Activate Group for Keyboard & Services
+        # Activate Group for Keyboard & Services (Recovers old groups instantly)
         await db.add_group(chat.id, chat.title)
         await db.set_group_active(chat.id, 1)
         
         text = (
-            f"✨ **Bot Activated in {escape_html(chat.title)}!**\n\n"
-            f"Hello {user.mention_markdown_v2()} 👋\n"
+            f"✨ <b>Bot Activated in {escape_html(chat.title)}!</b>\n\n"
+            f"Hello {user.mention_html()} 👋\n"
             "Use the menu keyboard below to explore links, offers, and support!"
         )
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
     else:
         # Private Chat
         await db.add_user(user.id, user.username)
         if user.id == OWNER_ID:
-            await update.message.reply_text("👋 **Welcome Owner!**\nUse `/help` to open the Admin Control Panel.", reply_markup=reply_markup, parse_mode="Markdown")
+            await update.message.reply_text("👋 <b>Welcome Owner!</b>\nUse /help to open the Admin Control Panel.", reply_markup=reply_markup, parse_mode="HTML")
         else:
-            await update.message.reply_text(f"👋 Welcome **{escape_html(user.first_name)}**!\n\nUse the menu buttons below to interact with us.", reply_markup=reply_markup, parse_mode="Markdown")
+            await update.message.reply_text(f"👋 Welcome <b>{escape_html(user.first_name)}</b>!\n\nUse the menu buttons below to interact with us.", reply_markup=reply_markup, parse_mode="HTML")
 
 @owner_only
 async def help_cmd(update, context):
     help_text = (
-        "👑 **Owner Control Panel**\n\n"
-        "📢 **Ad Messages:**\n"
-        "`/setmessage <text>` - Add an ad\n"
-        "`/setmessage replace <text>` - Replace ALL ads with this new one\n"
-        "`/clearmessages` - Delete all saved ads\n"
-        "`/removemessage <id>` - Remove specific ad\n"
-        "`/messages` - View all saved ads\n"
-        "`/setinterval <minutes>` - Change post frequency\n\n"
-        "🎉 **Welcome Setup:**\n"
-        "`/welcome <text>` - Set welcome text (Use `{name}` and `{group}`)\n"
-        "*Reply to a photo/video with `/welcome` to set a media welcome!*\n\n"
-        "🔘 **Buttons:**\n"
-        "`/buttons` - Manage Inline Buttons\n"
-        "`/keyboard` - Manage Reply Keyboard Menu\n\n"
-        "📊 **Management:**\n"
-        "`/groups` - View joined groups\n"
-        "`/stats` - View system analytics\n"
-        "`/broadcast` - Reply to any message to broadcast"
+        "👑 <b>Owner Control Panel</b>\n\n"
+        "📢 <b>Ad Messages:</b>\n"
+        "<code>/setmessage &lt;text&gt;</code> - Add an ad\n"
+        "<code>/setmessage replace &lt;text&gt;</code> - Replace ALL ads\n"
+        "<code>/clearmessages</code> - Delete all saved ads\n"
+        "<code>/removemessage &lt;id&gt;</code> - Remove specific ad\n"
+        "<code>/messages</code> - View all saved ads\n"
+        "<code>/setinterval &lt;minutes&gt;</code> - Change post frequency\n\n"
+        "🎉 <b>Welcome Setup:</b>\n"
+        "<code>/welcome &lt;text&gt;</code> - Set welcome (Use {name} and {group})\n"
+        "<i>Reply to a photo/video with /welcome to set a media welcome!</i>\n\n"
+        "🔘 <b>Buttons:</b>\n"
+        "<code>/buttons</code> - Manage Inline Buttons\n"
+        "<code>/keyboard</code> - Manage Reply Keyboard Menu\n\n"
+        "📊 <b>Management:</b>\n"
+        "<code>/groups</code> - View joined groups\n"
+        "<code>/stats</code> - View system analytics\n"
+        "<code>/broadcast</code> - Reply to any message to broadcast"
     )
-    await update.message.reply_text(help_text, parse_mode='Markdown')
+    await update.message.reply_text(help_text, parse_mode='HTML')
 
 # --- Ad Message Management ---
 @owner_only
 async def setmessage_cmd(update, context):
     if not update.message.text_html or len(update.message.text.split()) < 2:
-        await update.message.reply_text("Usage:\n`/setmessage <b>My Ad Text</b>` (Adds ad)\n`/setmessage replace <b>My Ad Text</b>` (Overwrites all old ads)", parse_mode="Markdown")
+        await update.message.reply_text("Usage:\n<code>/setmessage My Ad Text</code> (Adds ad)\n<code>/setmessage replace My Ad Text</code> (Overwrites all old ads)", parse_mode="HTML")
         return
 
     full_text = update.message.text_html
-    command_part = full_text.split()[0]
+    command_part = update.message.text.split()[0] # The exact command typed
     content = full_text.replace(command_part, '', 1).strip()
 
     if content.lower().startswith("replace"):
         content = content[7:].strip()
         await db.clear_all_messages()
         await db.add_message(content)
-        await update.message.reply_text("🔄 **All previous ads replaced with new ad message!**", parse_mode="Markdown")
+        await update.message.reply_text("🔄 <b>All previous ads replaced with new ad message!</b>\n(Your formatting is saved perfectly)", parse_mode="HTML")
     else:
         await db.add_message(content)
-        await update.message.reply_text("✅ **New advertisement message added!**", parse_mode="Markdown")
+        await update.message.reply_text("✅ <b>New advertisement message added!</b>\n(Your formatting is saved perfectly)", parse_mode="HTML")
 
 @owner_only
 async def clearmessages_cmd(update, context):
     await db.clear_all_messages()
-    await update.message.reply_text("🗑 **All advertisement messages have been deleted.**")
+    await update.message.reply_text("🗑 <b>All advertisement messages have been deleted.</b>", parse_mode="HTML")
 
 @owner_only
 async def removemessage_cmd(update, context):
     try:
         msg_id = int(context.args[0])
         await db.del_message(msg_id)
-        await update.message.reply_text(f"🗑 Message ID `{msg_id}` deleted!", parse_mode="Markdown")
+        await update.message.reply_text(f"🗑 Message ID <code>{msg_id}</code> deleted!", parse_mode="HTML")
     except (IndexError, ValueError):
-        await update.message.reply_text("Usage: `/removemessage <id>`", parse_mode="Markdown")
+        await update.message.reply_text("Usage: <code>/removemessage &lt;id&gt;</code>", parse_mode="HTML")
 
 @owner_only
 async def messages_cmd(update, context):
@@ -96,10 +96,10 @@ async def messages_cmd(update, context):
         await update.message.reply_text("📜 No advertisement messages found in database.")
         return
     
-    res = "📜 **Saved Advertisements:**\n\n"
+    res = "📜 <b>Saved Advertisements:</b>\n\n"
     for m in msgs:
-        # Safe raw preview display
-        res += f"🔹 **ID:** `{m['id']}`\n{escape_html(m['text'])}\n───────────────\n"
+        # Render the EXACT HTML without escaping it so formatting works
+        res += f"🔹 <b>ID:</b> <code>{m['id']}</code>\n{m['text']}\n───────────────\n"
     
     await update.message.reply_text(res[:4000], parse_mode='HTML')
 
@@ -116,9 +116,9 @@ async def setinterval_cmd(update, context):
             job.schedule_removal()
         
         context.job_queue.run_repeating(ad_job, interval=minutes*60, first=5, name="ad_job")
-        await update.message.reply_text(f"⏱ Interval updated to **{minutes} minutes**.", parse_mode="Markdown")
+        await update.message.reply_text(f"⏱ Interval updated to <b>{minutes} minutes</b>.", parse_mode="HTML")
     except (IndexError, ValueError):
-        await update.message.reply_text("Usage: `/setinterval <minutes>`", parse_mode="Markdown")
+        await update.message.reply_text("Usage: <code>/setinterval &lt;minutes&gt;</code>", parse_mode="HTML")
 
 @owner_only
 async def welcome_cmd(update, context):
@@ -136,28 +136,28 @@ async def welcome_cmd(update, context):
             await db.set_setting("welcome_media_type", media_type)
             caption = reply_msg.caption_html if reply_msg.caption_html else "Welcome to {group}, {name}! ❤️"
             await db.set_setting("welcome", caption)
-            await update.message.reply_text("🖼 **Media Welcome Message Updated!**", parse_mode="Markdown")
+            await update.message.reply_text("🖼 <b>Media Welcome Message Updated!</b>", parse_mode="HTML")
             return
             
     if not update.message.text_html or len(update.message.text.split()) < 2:
-        await update.message.reply_text("Usage: `/welcome <text>`\nUse `{name}` for username and `{group}` for group title.\nOr reply to a photo/video with `/welcome`!", parse_mode="Markdown")
+        await update.message.reply_text("Usage: <code>/welcome &lt;text&gt;</code>\nUse {name} for username and {group} for group title.\nOr reply to a photo/video with /welcome!", parse_mode="HTML")
         return
         
     full_text = update.message.text_html
-    command_part = full_text.split()[0]
+    command_part = update.message.text.split()[0]
     html_text = full_text.replace(command_part, '', 1).strip()
     
     await db.set_setting("welcome", html_text)
     await db.set_setting("welcome_media_id", "") 
     await db.set_setting("welcome_media_type", "")
-    await update.message.reply_text("📝 **Text Welcome Message Updated!**", parse_mode="Markdown")
+    await update.message.reply_text("📝 <b>Text Welcome Message Updated!</b>", parse_mode="HTML")
 
 # --- Inline & Reply Keyboard Commands ---
 @owner_only
 async def button_cmd(update, context):
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
-        await update.message.reply_text("Usage:\n`/buttons add url | Join | https://t.me/example`\n`/buttons add reply | Secret | Gift text`\n`/buttons del <id>`\n`/buttons list`", parse_mode="Markdown")
+        await update.message.reply_text("Usage:\n<code>/buttons add url | Join | https://t.me/example</code>\n<code>/buttons add reply | Secret | Gift text</code>\n<code>/buttons del &lt;id&gt;</code>\n<code>/buttons list</code>", parse_mode="HTML")
         return
     
     cmd_str = args[1]
@@ -167,7 +167,7 @@ async def button_cmd(update, context):
             b_type, name, content = parts[0].strip().lower(), parts[1].strip(), parts[2].strip()
             if b_type in ['url', 'reply']:
                 await db.add_button(name, b_type, content)
-                await update.message.reply_text(f"✅ Inline Button **{name}** added!", parse_mode="Markdown")
+                await update.message.reply_text(f"✅ Inline Button <b>{name}</b> added!", parse_mode="HTML")
             else:
                 await update.message.reply_text("Type must be `url` or `reply`.")
         else:
@@ -181,42 +181,42 @@ async def button_cmd(update, context):
             await update.message.reply_text("Provide valid button ID.")
     elif cmd_str.startswith("list"):
         btns = await db.get_all_buttons()
-        res = "🔘 **Active Inline Buttons:**\n\n"
+        res = "🔘 <b>Active Inline Buttons:</b>\n\n"
         for b in btns:
-            res += f"• **ID:** `{b['id']}` | **Name:** {b['name']} | **Type:** {b['btn_type']}\n"
-        await update.message.reply_text(res or "No inline buttons set.", parse_mode="Markdown")
+            res += f"• <b>ID:</b> <code>{b['id']}</code> | <b>Name:</b> {b['name']} | <b>Type:</b> {b['btn_type']}\n"
+        await update.message.reply_text(res or "No inline buttons set.", parse_mode="HTML")
 
 @owner_only
 async def keyboard_cmd(update, context):
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
         help_text = (
-            "⌨️ **Reply Keyboard Manager**\n\n"
-            "`/keyboard enable` - Show keyboard\n"
-            "`/keyboard disable` - Hide keyboard\n"
-            "`/keyboard list` - List buttons\n"
-            "`/keyboard del <id>` - Delete button\n\n"
-            "**Add Text/URL:**\n"
-            "`/keyboard add text | 🎁 VIP | Join VIP channel here: https://t.me/xxx`\n"
-            "`/keyboard add url | 🌐 Site | https://google.com`\n\n"
-            "**Add Media:**\nReply to photo/video/doc with:\n`/keyboard add media | 📸 View Offer | Check this out!`"
+            "⌨️ <b>Reply Keyboard Manager</b>\n\n"
+            "<code>/keyboard enable</code> - Show keyboard\n"
+            "<code>/keyboard disable</code> - Hide keyboard\n"
+            "<code>/keyboard list</code> - List buttons\n"
+            "<code>/keyboard del &lt;id&gt;</code> - Delete button\n\n"
+            "<b>Add Text/URL:</b>\n"
+            "<code>/keyboard add text | 🎁 VIP | Join VIP channel here: https://t.me/xxx</code>\n"
+            "<code>/keyboard add url | 🌐 Site | https://google.com</code>\n\n"
+            "<b>Add Media:</b>\nReply to photo/video/doc with:\n<code>/keyboard add media | 📸 View Offer | Check this out!</code>"
         )
-        await update.message.reply_text(help_text, parse_mode="Markdown")
+        await update.message.reply_text(help_text, parse_mode="HTML")
         return
     
     cmd_str = args[1]
     if cmd_str == "enable":
         await db.set_setting("keyboard_enabled", "1")
-        await update.message.reply_text("✅ Reply Keyboard Enabled! Send `/start` to view.", reply_markup=await build_reply_keyboard(), parse_mode="Markdown")
+        await update.message.reply_text("✅ Reply Keyboard Enabled! Send `/start` to view.", reply_markup=await build_reply_keyboard(), parse_mode="HTML")
     elif cmd_str == "disable":
         await db.set_setting("keyboard_enabled", "0")
         await update.message.reply_text("❌ Reply Keyboard Disabled!", reply_markup=await build_reply_keyboard())
     elif cmd_str.startswith("list"):
         btns = await db.get_all_reply_buttons()
-        res = "⌨️ **Active Keyboard Buttons:**\n\n"
+        res = "⌨️ <b>Active Keyboard Buttons:</b>\n\n"
         for b in btns:
-            res += f"• **ID:** `{b['id']}` | **Name:** {b['name']} | **Type:** {b['r_type']}\n"
-        await update.message.reply_text(res or "No keyboard buttons set.", parse_mode="Markdown")
+            res += f"• <b>ID:</b> <code>{b['id']}</code> | <b>Name:</b> {b['name']} | <b>Type:</b> {b['r_type']}\n"
+        await update.message.reply_text(res or "No keyboard buttons set.", parse_mode="HTML")
     elif cmd_str.startswith("del"):
         try:
             b_id = int(cmd_str.split()[1])
@@ -232,13 +232,13 @@ async def keyboard_cmd(update, context):
             name = parts[1].strip()
             content = "|".join(parts[2:]).strip()
             await db.add_reply_button(name, action_type, content)
-            await update.message.reply_text(f"✅ Keyboard button **{name}** added!", reply_markup=await build_reply_keyboard(), parse_mode="Markdown")
+            await update.message.reply_text(f"✅ Keyboard button <b>{name}</b> added!", reply_markup=await build_reply_keyboard(), parse_mode="HTML")
         elif action_type == 'media' and len(parts) >= 2:
             name = parts[1].strip()
             caption = "|".join(parts[2:]).strip() if len(parts) > 2 else ""
             reply_msg = update.message.reply_to_message
             if not reply_msg:
-                await update.message.reply_text("⚠️ Reply to a photo, video, or document with `/keyboard add media | <Name> | [Caption]`")
+                await update.message.reply_text("⚠️ Reply to a photo, video, or document with <code>/keyboard add media | &lt;Name&gt; | [Caption]</code>", parse_mode="HTML")
                 return
                 
             media_id, media_type = None, None
@@ -250,7 +250,7 @@ async def keyboard_cmd(update, context):
                 
             if media_id:
                 await db.add_reply_button(name, 'media', media_id, media_type, caption)
-                await update.message.reply_text(f"✅ Media button **{name}** added!", reply_markup=await build_reply_keyboard(), parse_mode="Markdown")
+                await update.message.reply_text(f"✅ Media button <b>{name}</b> added!", reply_markup=await build_reply_keyboard(), parse_mode="HTML")
             else:
                 await update.message.reply_text("⚠️ Unsupported media format.")
 
@@ -260,7 +260,7 @@ async def broadcast_cmd(update, context):
     if update.message.reply_to_message:
         users = await db.get_all_users()
         sent, failed = 0, 0
-        status_msg = await update.message.reply_text("🚀 **Broadcasting message...**", parse_mode="Markdown")
+        status_msg = await update.message.reply_text("🚀 <b>Broadcasting message...</b>", parse_mode="HTML")
         for u in users:
             try:
                 await update.message.reply_to_message.copy(u['id'])
@@ -268,9 +268,9 @@ async def broadcast_cmd(update, context):
                 await asyncio.sleep(0.05)
             except Exception:
                 failed += 1
-        await status_msg.edit_text(f"✅ **Broadcast Complete!**\n\n• **Delivered:** `{sent}`\n• **Failed:** `{failed}`\n• **Total:** `{len(users)}`", parse_mode="Markdown")
+        await status_msg.edit_text(f"✅ <b>Broadcast Complete!</b>\n\n• <b>Delivered:</b> <code>{sent}</code>\n• <b>Failed:</b> <code>{failed}</code>\n• <b>Total:</b> <code>{len(users)}</code>", parse_mode="HTML")
     else:
-        await update.message.reply_text("Reply to any message with `/broadcast` to send it to all users.", parse_mode="Markdown")
+        await update.message.reply_text("Reply to any message with <code>/broadcast</code> to send it to all users.", parse_mode="HTML")
 
 @owner_only
 async def stats_cmd(update, context):
@@ -278,7 +278,7 @@ async def stats_cmd(update, context):
     groups = len(await db.get_groups())
     msgs = len(await db.get_all_messages())
     db_size = os.path.getsize(db.db_path) / 1024 if os.path.exists(db.db_path) else 0
-    await update.message.reply_text(f"📊 **System Analytics:**\n\n👥 **Users:** `{users}`\n🏢 **Groups:** `{groups}`\n📝 **Saved Ads:** `{msgs}`\n💾 **DB Size:** `{db_size:.2f} KB`", parse_mode="Markdown")
+    await update.message.reply_text(f"📊 <b>System Analytics:</b>\n\n👥 <b>Users:</b> <code>{users}</code>\n🏢 <b>Groups:</b> <code>{groups}</code>\n📝 <b>Saved Ads:</b> <code>{msgs}</code>\n💾 <b>DB Size:</b> <code>{db_size:.2f} KB</code>", parse_mode="HTML")
 
 @owner_only
 async def groups_cmd(update, context):
@@ -286,9 +286,9 @@ async def groups_cmd(update, context):
     if not groups:
         await update.message.reply_text("Bot is not active in any groups.")
         return
-    res = "🏢 **Active Groups:**\n\n"
+    res = "🏢 <b>Active Groups:</b>\n\n"
     for g in groups:
-        res += f"• **{escape_html(g['title'])}** (ID: `{g['id']}`)\n"
+        res += f"• <b>{escape_html(g['title'])}</b> (ID: <code>{g['id']}</code>)\n"
     await update.message.reply_text(res[:4000], parse_mode="HTML")
 
 # --- Event Handlers ---
@@ -297,7 +297,8 @@ async def bot_added_to_group(update, context):
     chat = result.chat
     if result.new_chat_member.status in ['member', 'administrator']:
         await db.add_group(chat.id, chat.title)
-        await context.bot.send_message(OWNER_ID, f"✅ Bot added to group **{escape_html(chat.title)}**!", parse_mode="HTML")
+        await db.set_group_active(chat.id, 1) # Auto activate when added
+        await context.bot.send_message(OWNER_ID, f"✅ Bot added to group <b>{escape_html(chat.title)}</b>!", parse_mode="HTML")
     elif result.new_chat_member.status in ['left', 'kicked']:
         await db.remove_group(chat.id)
 
@@ -347,7 +348,13 @@ async def handle_general_messages(update, context):
     chat = update.effective_chat
     text = update.message.text
 
-    # 1. KEYBOARD BUTTON INTERCEPTOR (Groups & Private Chats)
+    # --- Auto-Recover Old Groups ---
+    if chat.type in ['group', 'supergroup']:
+        # This guarantees old groups are saved back to the database automatically
+        await db.add_group(chat.id, chat.title)
+        await db.set_group_active(chat.id, 1)
+
+    # 1. KEYBOARD BUTTON INTERCEPTOR
     if text:
         btn = await db.get_reply_button_by_name(text)
         if btn:
@@ -384,10 +391,4 @@ async def handle_general_messages(update, context):
                     await update.message.reply_text("⚠️ User ID mapping not found for this message.")
         else:
             await db.add_user(user_id, update.effective_user.username)
-            # Route DM to Owner
-            msg = await update.message.copy(OWNER_ID)
-            info_msg = await context.bot.send_message(OWNER_ID, f"💬 **DM from {escape_html(update.effective_user.first_name)}**", reply_to_message_id=msg.message_id, parse_mode="HTML")
-            
-            await db.map_support_msg(msg.message_id, user_id)
-            await db.map_support_msg(info_msg.message_id, user_id)
             
