@@ -1,3 +1,4 @@
+import html
 from functools import wraps
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from config import OWNER_ID
@@ -11,8 +12,12 @@ def owner_only(func):
         return await func(update, context, *args, **kwargs)
     return wrapper
 
+def escape_html(text: str) -> str:
+    """Safely escapes text for Telegram HTML rendering."""
+    return html.escape(text) if text else ""
+
 async def build_inline_keyboard():
-    """Generates the inline keyboard for ad messages."""
+    """Generates inline keyboard markup for ads."""
     buttons_data = await db.get_all_buttons()
     keyboard = []
     for b in buttons_data:
@@ -23,7 +28,7 @@ async def build_inline_keyboard():
     return InlineKeyboardMarkup(keyboard) if keyboard else None
 
 async def build_reply_keyboard():
-    """Generates the persistent user Reply Keyboard menu."""
+    """Generates clean 2-column persistent Reply Keyboard menu."""
     is_enabled = await db.get_setting("keyboard_enabled")
     if is_enabled == '0':
         return ReplyKeyboardRemove()
